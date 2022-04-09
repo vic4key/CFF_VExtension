@@ -3,13 +3,15 @@ _ _ _
 
 #### Features
 
->Automatic undecorates the decorated C++ symbol names for `Import/Export Directory` tab
+>Automatic undecorates the decorated C++ symbol names for `Import/Export Directory` tab.
+>
+>Shorten symbol name for several libraries such as std, boost, etc.
 
 #### Usage
 
 >Step 1. Install the required package [Redistributable 2019](https://aka.ms/vs/17/release/vc_redist.x64.exe) `(ignore if installed)`
 >
->Step 2. Copy the [bin\VExtension.dll](bins/VExtension.dll) into the folder `C:\Program Files\NTCore\Explorer Suite\Extensions\CFF Explorer\VExtension\`
+>Step 2. Copy the folder [bins\\VExtension\\](bins/VExtension/) into the folder `C:\Program Files\NTCore\Explorer Suite\Extensions\CFF Explorer\`
 >
 >Step 3. Enjoy
 
@@ -33,7 +35,7 @@ _ _ _
 >
 >- [ ] Detect symbol name for `Ordinal` if they are possible
 >
->- [ ] Shorten symbol name for several libraries such as std, boost, etc eg. `std::basic_ostream<char,struct std::char_traits<char>>` to `std::ostream`, etc
+>- [x] Shorten symbol name for several libraries such as std, boost, etc eg. `std::basic_ostream<char,struct std::char_traits<char>>` to `std::ostream`, etc (Doing)
 _ _ _
 
 Website: https://vic.onl/

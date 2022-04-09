@@ -1,0 +1,74 @@
+{
+  "symbol_name_rules": [ // type (0: simple; 1: regex)
+    {
+      "from": " * ",
+      "to": "*",
+      "type": 0
+    },
+    {
+      "from": "` ",
+      "to": "`",
+      "type": 0
+    },
+    {
+      "from": " >",
+      "to": ">",
+      "type": 0
+    },
+    {
+      "from": "  ",
+      "to": " ",
+      "type": 0
+    },
+    {
+      "from": " &",
+      "to": "&",
+      "type": 0
+    },
+    {
+      "from": " )",
+      "to": ")",
+      "type": 0
+    },
+    {
+      "from": " ,",
+      "to": ",",
+      "type": 0
+    },
+    {
+      "from": ", ",
+      "to": ",",
+      "type": 0
+    },
+    {
+      "from": "__ptr64",
+      "to": "",
+      "type": 0
+    },
+    {
+      "from": "struct ",
+      "to": "",
+      "type": 0
+    },
+    {
+      "from": "(void)",
+      "to": "()",
+      "type": 0
+    },
+    {
+      "from": "class std",
+      "to": "std",
+      "type": 0
+    },
+    {
+      "from": "<([ _\\d\\w]+),std::char_traits<([ _\\d\\w]+)>>",
+      "to": "<$1>",
+      "type": 1
+    },
+    {
+      "from": "basic_(streambuf|iostream|ostream|ios|istream|filebuf)",
+      "to": "$1",
+      "type": 1
+    }
+  ]
+}

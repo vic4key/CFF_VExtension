@@ -1,12 +1,16 @@
 // dllmain.cpp : Defines the entry point for the DLL application.
 
 #include <vu>
+#include <regex>
+#include <fstream>
 #include "resource.h"
 #include "CFFExplorerSDK.h"
 
 #pragma pack(push, 8)
 #include <psapi.h>
 #pragma pack(pop)
+
+#define CFF_API extern "C" __declspec(dllexport)
 
 #define USE_DBGHELP TRUE
 
@@ -15,7 +19,20 @@
 #pragma comment(lib, "dbghelp.lib")
 #endif // USE_DBGHELP
 
-#define CFF_API extern "C" __declspec(dllexport)
+#include <json.hpp>
+#include <fifo_map.hpp>
+
+template<class K, class V, class dummy_compare, class A>
+using unordered_fifo_map = nlohmann::fifo_map<K, V, nlohmann::fifo_map_compare<K>, A>;
+using json = nlohmann::basic_json<unordered_fifo_map>;
+
+template <typename value_t>
+value_t json_get(const json& jobject, const std::string& name, const value_t def)
+{
+  return jobject.contains(name) ? jobject[name].get<value_t>() : def;
+}
+
+static json g_prefs;
 
 /**
  * VExtension.asm
@@ -33,6 +50,40 @@ static vu::ulongptr conv_ansi_to_unicode = NULL;
 
 static QWORD g_rdx = NULL;
 
+enum symbol_name_rule_type_t : int
+{
+  simple,
+  regex,
+};
+
+struct symbol_name_rule_object_t
+{
+  int type; // symbol_name_rule_type_t
+  std::string from;
+  std::string to;
+};
+
+std::vector<symbol_name_rule_object_t> g_symbol_name_rules;
+
+std::string update_symbol_name_for_friendly(const std::string& text)
+{
+  std::string result = text;
+
+  for (auto& rule : g_symbol_name_rules)
+  {
+    if (rule.type == symbol_name_rule_type_t::simple)
+    {
+      result = vu::replace_string_A(result, rule.from, rule.to);
+    }
+    else if (rule.type == symbol_name_rule_type_t::regex)
+    {
+      result = vu::regex_replace_string_A(result, std::regex(rule.from), rule.to);
+    }
+  }
+
+  return result;
+}
+
 static QWORD update_rdx_resgiter()
 {
   std::string str = (char*)g_rdx;
@@ -40,12 +91,19 @@ static QWORD update_rdx_resgiter()
   {
     static char data[KiB] = { 0 };
     memset(data, 0, sizeof(data));
+
     #ifdef USE_DBGHELP
     UnDecorateSymbolName(str.c_str(), data, sizeof(data), UNDNAME_COMPLETE);
     #else  // USE_DBGHELP
     str = vu::undecorate_cpp_symbol_A(str);
     strcpy_s(data, str.c_str());
     #endif // USE_DBGHELP
+
+    str.assign(data);
+    str = update_symbol_name_for_friendly(str);
+    memset(data, 0, sizeof(data));
+    strcpy_s(data, str.c_str());
+
     g_rdx = QWORD(&data);
   }
 
@@ -63,6 +121,43 @@ static QWORD conv_ansi_to_unicode_hook(QWORD rcx, QWORD rdx)
 CFF_API BOOL __cdecl ExtensionLoad(EXTINITDATA* pExtInitData)
 {
   CFF_Initialize(pExtInitData);
+
+  try
+  {
+    char tmp[KiB] = { 0 };
+    GetModuleFileNameA(hInstance, tmp, sizeof(tmp));
+
+    auto file_dir = vu::extract_file_directory_A(tmp);
+    auto file_name = vu::extract_file_name_A(tmp, false) + ".json";
+
+    vu::PathA prefs_file;
+    prefs_file.join(file_dir).join(file_name).finalize();
+
+    std::ifstream fs(prefs_file.as_string());
+    g_prefs = json::parse(fs, nullptr, true, true);
+
+    g_symbol_name_rules.clear();
+    if (g_prefs.contains("symbol_name_rules"))
+    {
+      auto& jsymbol_name_rules = g_prefs["symbol_name_rules"];
+      for (auto& e : jsymbol_name_rules)
+      {
+        symbol_name_rule_object_t symbol_name_rule;
+        symbol_name_rule.type = json_get(e, "type", -1);
+        symbol_name_rule.from = json_get(e, "from", std::string(""));
+        symbol_name_rule.to   = json_get(e, "to", std::string(""));
+        g_symbol_name_rules.push_back(std::move(symbol_name_rule));
+      }
+    }
+  }
+  catch (json::parse_error& e)
+  {
+    OutputDebugStringA(e.what());
+  }
+  catch (...)
+  {
+    OutputDebugStringA("Unknown Exception");
+  }
 
   #ifdef USE_DBGHELP
   SymSetOptions(SYMOPT_UNDNAME | SYMOPT_DEFERRED_LOADS);
