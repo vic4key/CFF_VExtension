@@ -46,10 +46,67 @@ static LRESULT CALLBACK DlgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPar
 enum INL_Hooking
 {
   INL_conv_ansi_to_unicode,
+  INL_CGridCtrl_SendMessageToParent,
   Count,
 };
 
 vu::INLHooking INLHooking[INL_Hooking::Count];
+
+// UINT CWnd::GetDlgCtrlID(QWORD* vtable)
+
+UINT CWnd_GetDlgCtrlID(QWORD* vtable)
+{
+  const ULONG_PTR Offset_MFC_CWnd_m_hWnd = 0x8;
+  HWND hWnd = HWND(*(QWORD*)(vtable + Offset_MFC_CWnd_m_hWnd));
+  return GetDlgCtrlID(hWnd);
+}
+
+// CString CGridCtrl::GetItemText(int nRow, int nCol) const
+
+struct CString
+{
+  union
+  {
+    WCHAR data[MAXBYTE] = { 0 };
+    LPCWSTR ptr;
+  };
+
+  std::wstring c_str()
+  {
+    return ptr == NULL ? L"" : ptr;
+  }
+};
+
+typedef CString* (__fastcall* CGridCtrl_GetItemText_t)(QWORD* vtable_CGridCtrl, CString str, int nRow, int nCol);
+static CGridCtrl_GetItemText_t CGridCtrl_GetItemText_Ex = CGridCtrl_GetItemText_t(0x0000000140160680);
+
+std::wstring CGridCtrl_GetItemText(QWORD* vtable_CGridCtrl, int nRow, int nCol)
+{
+  static CString s;
+  auto result = CGridCtrl_GetItemText_Ex(vtable_CGridCtrl, s, nRow, nCol);
+  return result->c_str();
+}
+
+// LRESULT CGridCtrl::SendMessageToParent(int nRow, int nCol, int nMessage) const
+
+typedef QWORD (__fastcall *CGridCtrl_SendMessageToParent_t)(QWORD* vtable_CGridCtrl, int nRow, int nCol, int nMessage);
+static CGridCtrl_SendMessageToParent_t CGridCtrl_SendMessageToParent_backup = NULL;
+static vu::ulongptr CGridCtrl_SendMessageToParent = 0x000000014014B1E0;
+
+QWORD __fastcall CGridCtrl_SendMessageToParent_hook(QWORD* vtable_CGridCtrl, int nRow, int nCol, int nMessage)
+{
+  const UINT GVN_SELCHANGING = 0xFFFFFF9C;
+  if (nMessage == GVN_SELCHANGING && nRow >= 0 && nCol >= 0)
+  {
+    // get the text of the selected cell
+    // auto s = CGridCtrl_GetItemText(vtable_CGridCtrl, nRow, nCol);
+    // OutputDebugStringW(s.c_str());
+  }
+
+  return CGridCtrl_SendMessageToParent_backup(vtable_CGridCtrl, nRow, nCol, nMessage);
+}
+
+// QWORD conv_ansi_to_unicode(QWORD rcx, QWORD rdx)
 
 typedef QWORD (*conv_ansi_to_unicode_t)(QWORD rcx, QWORD rdx);
 static conv_ansi_to_unicode_t conv_ansi_to_unicode_backup = NULL;
@@ -124,6 +181,8 @@ static QWORD conv_ansi_to_unicode_hook(QWORD rcx, QWORD rdx)
   set_rdx_register(g_rdx);
   return conv_ansi_to_unicode_backup(rcx, rdx);
 }
+
+// Extension's Exportation Callback Functions
 
 CFF_API BOOL __cdecl ExtensionLoad(EXTINITDATA* pExtInitData)
 {
@@ -201,6 +260,9 @@ CFF_API BOOL __cdecl ExtensionLoad(EXTINITDATA* pExtInitData)
   result &= INLHooking[INL_Hooking::INL_conv_ansi_to_unicode].attach(
     LPVOID(conv_ansi_to_unicode), LPVOID(conv_ansi_to_unicode_hook), (void**)&conv_ansi_to_unicode_backup);
 
+  result &= INLHooking[INL_Hooking::INL_CGridCtrl_SendMessageToParent].attach(
+    LPVOID(CGridCtrl_SendMessageToParent), LPVOID(CGridCtrl_SendMessageToParent_hook), (void**)&CGridCtrl_SendMessageToParent_backup);
+
   return result;
 }
 
@@ -208,6 +270,9 @@ CFF_API VOID __cdecl ExtensionUnload()
 {
   INLHooking[INL_Hooking::INL_conv_ansi_to_unicode].detach(
     LPVOID(conv_ansi_to_unicode), (void**)&conv_ansi_to_unicode_backup);
+
+  INLHooking[INL_Hooking::INL_CGridCtrl_SendMessageToParent].detach(
+    LPVOID(CGridCtrl_SendMessageToParent), (void**)&CGridCtrl_SendMessageToParent_backup);
 
   #ifdef USE_DBGHELP
   SymCleanup(GetCurrentProcess());
