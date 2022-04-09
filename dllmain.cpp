@@ -43,8 +43,15 @@ extern "C" void set_rdx_register(QWORD& rdx);
 static HINSTANCE hInstance = nullptr;
 static LRESULT CALLBACK DlgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
-vu::INLHooking INLHooking;
-typedef QWORD(*conv_ansi_to_unicode_t)(QWORD rcx, QWORD rdx);
+enum INL_Hooking
+{
+  INL_conv_ansi_to_unicode,
+  Count,
+};
+
+vu::INLHooking INLHooking[INL_Hooking::Count];
+
+typedef QWORD (*conv_ansi_to_unicode_t)(QWORD rcx, QWORD rdx);
 static conv_ansi_to_unicode_t conv_ansi_to_unicode_backup = NULL;
 static vu::ulongptr conv_ansi_to_unicode = NULL;
 
@@ -189,13 +196,17 @@ CFF_API BOOL __cdecl ExtensionLoad(EXTINITDATA* pExtInitData)
 
   conv_ansi_to_unicode = vu::ulongptr(mi.lpBaseOfDll) + offset.second;
 
-  return INLHooking.attach(
+  bool result = true;
+
+  result &= INLHooking[INL_Hooking::INL_conv_ansi_to_unicode].attach(
     LPVOID(conv_ansi_to_unicode), LPVOID(conv_ansi_to_unicode_hook), (void**)&conv_ansi_to_unicode_backup);
+
+  return result;
 }
 
 CFF_API VOID __cdecl ExtensionUnload()
 {
-  INLHooking.detach(
+  INLHooking[INL_Hooking::INL_conv_ansi_to_unicode].detach(
     LPVOID(conv_ansi_to_unicode), (void**)&conv_ansi_to_unicode_backup);
 
   #ifdef USE_DBGHELP
