@@ -3,11 +3,11 @@ _ _ _
 
 #### Features
 
->Automatic undecorates the decorated C++ symbol names for `Import/Export Directory` tab.
+>Undecorate the decorated C++ symbol names in the `Import/Export Directory` tab.
+>
+>Resolve symbol name for symbols that imported by `Ordinal` in the `Import Directory` tab.
 >
 >Shorten symbol name for several libraries such as std, boost, etc.
->
->Detect symbol name for symbols that imported by `Ordinal`.
 
 #### Usage
 
@@ -25,7 +25,7 @@ _ _ _
 >
 >![](screenshots/resolve-ordinal.png?)
 
-##### Development
+#### Development
 
 >Step 1. Required Visual Studio C++ 2019 or later.
 >
@@ -35,11 +35,11 @@ _ _ _
 
 #### TODO
 
->- [ ] Release `32-bit` version for this extension
+>- [ ] Release `32-bit` version for this extension.
 >
->- [x] Detect symbol name for `Ordinal` if they are possible
+>- [x] Resolve symbol name for `Ordinal` if they are possible.
 >
->- [x] Shorten symbol name for several libraries such as std, boost, etc eg. `std::basic_ostream<char,struct std::char_traits<char>>` to `std::ostream`, etc (Doing)
+>- [x] Shorten symbol name for several libraries such as std, boost, etc eg. `std::basic_ostream<char,struct std::char_traits<char>>` to `std::ostream`, etc `(Doing)`.
 _ _ _
 
 Website: https://vic.onl/
