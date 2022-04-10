@@ -3,12 +3,9 @@
 #include <vu>
 #include <regex>
 #include <fstream>
+#include <psapi.h>
 #include "resource.h"
 #include "CFFExplorerSDK.h"
-
-#pragma pack(push, 8)
-#include <psapi.h>
-#pragma pack(pop)
 
 #define LOG(s) OutputDebugStringA("VExtension: " ## s)
 
@@ -272,7 +269,7 @@ bool aob_find_addresses()
   std::string pattern;
   std::pair<bool, size_t> offset(false, -1);
 
-  // <cff_explorer.`QWORD conv_ansi_to_unicode(QWORD rcx, QWORD rdx)`
+  // <cff_explorer>.`QWORD conv_ansi_to_unicode(QWORD rcx, QWORD rdx)`
   // 00000001400186E0 | 48:895424 10    | mov qword ptr ss:[rsp+10],rdx
   // 00000001400186E5 | 48:894C24 08    | mov qword ptr ss:[rsp+8],rcx
   // 00000001400186EA | 48:83EC 48      | sub rsp,48
@@ -292,7 +289,7 @@ bool aob_find_addresses()
     return false;
   }
 
-  // <cff_explorer.`QWORD grid_add_item(QWORD rcx, QWORD rdx)`
+  // <cff_explorer>.`QWORD grid_add_item(QWORD rcx, QWORD rdx)`
   // 00000001400057D0 | 48:895424 10 | mov qword ptr ss:[rsp+10],rdx
   // 00000001400057D5 | 48:894C24 08 | mov qword ptr ss:[rsp+8],rcx
   // 00000001400057DA | 48:83EC 28   | sub rsp,28
