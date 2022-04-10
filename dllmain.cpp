@@ -46,6 +46,7 @@ static LRESULT CALLBACK DlgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPar
 enum INL_Hooking
 {
   INL_conv_ansi_to_unicode,
+  INL_grid_add_item,
   INL_CGridCtrl_SendMessageToParent,
   Count,
 };
@@ -93,6 +94,8 @@ typedef QWORD (__fastcall *CGridCtrl_SendMessageToParent_t)(QWORD* vtable_CGridC
 static CGridCtrl_SendMessageToParent_t CGridCtrl_SendMessageToParent_backup = NULL;
 static vu::ulongptr CGridCtrl_SendMessageToParent = 0x000000014014B1E0;
 
+std::unordered_map<DWORD, LPCSTR> g_ImportDirectory_Grid_IID_EOT_ENT; // mapping of Exported Ordinal Table and Exported Name Table
+
 QWORD __fastcall CGridCtrl_SendMessageToParent_hook(QWORD* vtable_CGridCtrl, int nRow, int nCol, int nMessage)
 {
   const UINT GVN_SELCHANGING = 0xFFFFFF9C;
@@ -101,6 +104,43 @@ QWORD __fastcall CGridCtrl_SendMessageToParent_hook(QWORD* vtable_CGridCtrl, int
     // get the text of the selected cell
     // auto s = CGridCtrl_GetItemText(vtable_CGridCtrl, nRow, nCol);
     // OutputDebugStringW(s.c_str());
+
+    auto ID = CWnd_GetDlgCtrlID(vtable_CGridCtrl);
+    const UINT ImportDirectory_Grid_IID_ID = 1006;
+    if (ID == ImportDirectory_Grid_IID_ID)
+    {
+      g_ImportDirectory_Grid_IID_EOT_ENT.clear();
+
+      auto module_name = CGridCtrl_GetItemText(vtable_CGridCtrl, nRow, 0);
+      if (!module_name.empty())
+      {
+        if (auto pBase = LoadLibraryExW(module_name.c_str(), nullptr, DONT_RESOLVE_DLL_REFERENCES))
+        {
+          if (auto pDOSHeader = PIMAGE_DOS_HEADER(pBase))
+          {
+            if (auto pNTHeaders = PIMAGE_NT_HEADERS(pDOSHeader->e_lfanew + vu::ulongptr(pDOSHeader)))
+            {
+              auto IED = pNTHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT];
+              if (IED.VirtualAddress != NULL && IED.Size != NULL)
+              {
+                auto pIED = PIMAGE_EXPORT_DIRECTORY(PBYTE(pBase) + IED.VirtualAddress);
+                if (pIED != nullptr && pIED->AddressOfNames != NULL && pIED->AddressOfNameOrdinals != NULL)
+                {
+                  auto pENT = PDWORD(PBYTE(pBase) + pIED->AddressOfNames); // Exported Name Table
+                  auto pEOT = PWORD(PBYTE(pBase) + pIED->AddressOfNameOrdinals); // Exported Ordinal Table
+                  for (DWORD i = 0; i < pIED->NumberOfNames; i++)
+                  {
+                    const auto ordinal = pEOT[i] + pIED->Base;
+                    const auto name = LPCSTR(PBYTE(pBase) + pENT[i]);
+                    g_ImportDirectory_Grid_IID_EOT_ENT[ordinal] = name;
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
   }
 
   return CGridCtrl_SendMessageToParent_backup(vtable_CGridCtrl, nRow, nCol, nMessage);
@@ -182,6 +222,41 @@ static QWORD conv_ansi_to_unicode_hook(QWORD rcx, QWORD rdx)
   return conv_ansi_to_unicode_backup(rcx, rdx);
 }
 
+// grid_add_item_hook
+
+typedef QWORD(*grid_add_item_t)(QWORD rcx, QWORD rdx);
+static grid_add_item_t grid_add_item_backup = NULL;
+static vu::ulongptr grid_add_item = 0x00000001400057D0;
+
+static QWORD grid_add_item_hook(QWORD rcx, QWORD rdx)
+{
+  if (rdx != NULL && !g_ImportDirectory_Grid_IID_EOT_ENT.empty())
+  {
+    std::wstring str = (wchar_t*)rdx;
+    if (vu::starts_with_W(str, L"Ordinal:") && !vu::ends_with_W(str, L")"))
+    {
+      DWORD ordinal = -1;
+      swscanf_s(str.c_str(), L"Ordinal: %08X", &ordinal); // `Ordinal: XXXXXXXX`
+      if (ordinal != -1)
+      {
+        auto it = g_ImportDirectory_Grid_IID_EOT_ENT.find(ordinal);
+        if (it != g_ImportDirectory_Grid_IID_EOT_ENT.cend())
+        {
+          static wchar_t data[MAXBYTE] = { 0 };
+          memset(data, 0, sizeof(data));
+
+          str += L" (" + vu::to_string_W(it->second) + L")";
+          wcscpy_s(data, str.c_str());
+
+          rdx = QWORD(&data);
+        }
+      }
+    }
+  }
+
+  return grid_add_item_backup(rcx, rdx);
+}
+
 // Extension's Exportation Callback Functions
 
 CFF_API BOOL __cdecl ExtensionLoad(EXTINITDATA* pExtInitData)
@@ -260,6 +335,9 @@ CFF_API BOOL __cdecl ExtensionLoad(EXTINITDATA* pExtInitData)
   result &= INLHooking[INL_Hooking::INL_conv_ansi_to_unicode].attach(
     LPVOID(conv_ansi_to_unicode), LPVOID(conv_ansi_to_unicode_hook), (void**)&conv_ansi_to_unicode_backup);
 
+  result &= INLHooking[INL_Hooking::INL_grid_add_item].attach(
+    LPVOID(grid_add_item), LPVOID(grid_add_item_hook), (void**)&grid_add_item_backup);
+
   result &= INLHooking[INL_Hooking::INL_CGridCtrl_SendMessageToParent].attach(
     LPVOID(CGridCtrl_SendMessageToParent), LPVOID(CGridCtrl_SendMessageToParent_hook), (void**)&CGridCtrl_SendMessageToParent_backup);
 
@@ -270,6 +348,9 @@ CFF_API VOID __cdecl ExtensionUnload()
 {
   INLHooking[INL_Hooking::INL_conv_ansi_to_unicode].detach(
     LPVOID(conv_ansi_to_unicode), (void**)&conv_ansi_to_unicode_backup);
+
+  INLHooking[INL_Hooking::INL_grid_add_item].detach(
+    LPVOID(grid_add_item), (void**)&grid_add_item_backup);
 
   INLHooking[INL_Hooking::INL_CGridCtrl_SendMessageToParent].detach(
     LPVOID(CGridCtrl_SendMessageToParent), (void**)&CGridCtrl_SendMessageToParent_backup);
