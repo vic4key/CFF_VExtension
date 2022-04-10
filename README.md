@@ -6,20 +6,24 @@ _ _ _
 >Automatic undecorates the decorated C++ symbol names for `Import/Export Directory` tab.
 >
 >Shorten symbol name for several libraries such as std, boost, etc.
+>
+>Detect symbol name for symbols that imported by `Ordinal`.
 
 #### Usage
 
->Step 1. Install the required package [Redistributable 2019](https://aka.ms/vs/17/release/vc_redist.x64.exe) `(ignore if installed)`
+>Step 1. Install the required package [Redistributable 2019](https://aka.ms/vs/17/release/vc_redist.x64.exe) `(ignore if installed)`.
 >
->Step 2. Copy the folder [bins\\VExtension\\](bins/VExtension/) into the folder `C:\Program Files\NTCore\Explorer Suite\Extensions\CFF Explorer\`
+>Step 2. Copy the [VExtension](bins/VExtension/) folder inside the `bins` folder to the `Explorer Suite\Extensions\CFF Explorer\` directory.
 >
->Step 3. Enjoy
+>Step 3. Enjoy.
 
 #### Screenshots
 
->![](screenshots/cff-imp-dir-cmp.png)
+>![](screenshots/cff-imp-dir-cmp.png?)
 >
->![](screenshots/cff-exp-dir-cmp.png)
+>![](screenshots/cff-exp-dir-cmp.png?)
+>
+>![](screenshots/resolve-ordinal.png?)
 
 ##### Development
 
@@ -33,7 +37,7 @@ _ _ _
 
 >- [ ] Release `32-bit` version for this extension
 >
->- [ ] Detect symbol name for `Ordinal` if they are possible
+>- [x] Detect symbol name for `Ordinal` if they are possible
 >
 >- [x] Shorten symbol name for several libraries such as std, boost, etc eg. `std::basic_ostream<char,struct std::char_traits<char>>` to `std::ostream`, etc (Doing)
 _ _ _
