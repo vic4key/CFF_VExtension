@@ -7,7 +7,7 @@ _ _ _
 >
 >Resolve symbol name for symbols that imported by `Ordinal` in the `Import Directory` tab.
 >
->Shorten symbol name for several libraries such as std, boost, etc.
+>Shorten symbol name for several C++ libraries such as STL.
 
 #### Usage
 
@@ -19,9 +19,7 @@ _ _ _
 
 #### Screenshots
 
->![](screenshots/cff-imp-dir-cmp.png?)
->
->![](screenshots/cff-exp-dir-cmp.png?)
+>![](screenshots/undecorate-shorten-name.png?)
 >
 >![](screenshots/resolve-ordinal.png?)
 
@@ -39,7 +37,7 @@ _ _ _
 >
 >- [x] Resolve symbol name for `Ordinal` if they are possible.
 >
->- [x] Shorten symbol name for several libraries such as std, boost, etc eg. `std::basic_ostream<char,struct std::char_traits<char>>` to `std::ostream`, etc `(Doing)`.
+>- [x] Shorten symbol name for several C++ libraries such as STL, Boost, Etc. Eg. `std::basic_ostream<char,struct std::char_traits<char>>` to `std::ostream`, etc (Doing).
 _ _ _
 
 Website: https://vic.onl/

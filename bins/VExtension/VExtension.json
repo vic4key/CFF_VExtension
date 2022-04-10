@@ -74,6 +74,16 @@
       "from": "basic_(streambuf|iostream|ostream|ios|istream|filebuf)",
       "to": "$1",
       "type": 1
+    },
+    {
+      "from": "(([_\\d\\w]+)<wchar_t\\>)",
+      "to": "w$2",
+      "type": 1
+    },
+    {
+      "from": "(([_\\d\\w]+)<char\\>)",
+      "to": "$2",
+      "type": 1
     }
   ]
 }
