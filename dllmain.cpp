@@ -10,6 +10,8 @@
 #include <psapi.h>
 #pragma pack(pop)
 
+#define LOG(s) OutputDebugStringA("VExtension: " ## s)
+
 #define CFF_API extern "C" __declspec(dllexport)
 
 #define USE_DBGHELP TRUE
@@ -62,7 +64,7 @@ UINT CWnd_GetDlgCtrlID(QWORD* vtable)
   return GetDlgCtrlID(hWnd);
 }
 
-// CString CGridCtrl::GetItemText(int nRow, int nCol) const
+// CString __fastcall CGridCtrl::GetItemText(int nRow, int nCol)
 
 struct CString
 {
@@ -79,7 +81,7 @@ struct CString
 };
 
 typedef CString* (__fastcall* CGridCtrl_GetItemText_t)(QWORD* vtable_CGridCtrl, CString str, int nRow, int nCol);
-static CGridCtrl_GetItemText_t CGridCtrl_GetItemText_Ex = CGridCtrl_GetItemText_t(0x0000000140160680);
+static CGridCtrl_GetItemText_t CGridCtrl_GetItemText_Ex = NULL;
 
 std::wstring CGridCtrl_GetItemText(QWORD* vtable_CGridCtrl, int nRow, int nCol)
 {
@@ -92,7 +94,7 @@ std::wstring CGridCtrl_GetItemText(QWORD* vtable_CGridCtrl, int nRow, int nCol)
 
 typedef QWORD (__fastcall *CGridCtrl_SendMessageToParent_t)(QWORD* vtable_CGridCtrl, int nRow, int nCol, int nMessage);
 static CGridCtrl_SendMessageToParent_t CGridCtrl_SendMessageToParent_backup = NULL;
-static vu::ulongptr CGridCtrl_SendMessageToParent = 0x000000014014B1E0;
+static vu::ulongptr CGridCtrl_SendMessageToParent = NULL;
 
 std::unordered_map<DWORD, LPCSTR> g_ImportDirectory_Grid_IID_EOT_ENT; // mapping of Exported Ordinal Table and Exported Name Table
 
@@ -222,11 +224,11 @@ static QWORD conv_ansi_to_unicode_hook(QWORD rcx, QWORD rdx)
   return conv_ansi_to_unicode_backup(rcx, rdx);
 }
 
-// grid_add_item_hook
+// QWORD grid_add_item(QWORD rcx, QWORD rdx)
 
 typedef QWORD(*grid_add_item_t)(QWORD rcx, QWORD rdx);
 static grid_add_item_t grid_add_item_backup = NULL;
-static vu::ulongptr grid_add_item = 0x00000001400057D0;
+static vu::ulongptr grid_add_item = NULL;
 
 static QWORD grid_add_item_hook(QWORD rcx, QWORD rdx)
 {
@@ -257,7 +259,106 @@ static QWORD grid_add_item_hook(QWORD rcx, QWORD rdx)
   return grid_add_item_backup(rcx, rdx);
 }
 
+bool aob_find_addresses()
+{
+  MODULEINFO mi = { 0 };
+  auto module = GetModuleHandle(nullptr);
+  GetModuleInformation(GetCurrentProcess(), module, &mi, sizeof(mi));
+  if (mi.lpBaseOfDll == 0 || mi.SizeOfImage == 0)
+  {
+    return false;
+  }
+
+  std::string pattern;
+  std::pair<bool, size_t> offset(false, -1);
+
+  // <cff_explorer.`QWORD conv_ansi_to_unicode(QWORD rcx, QWORD rdx)`
+  // 00000001400186E0 | 48:895424 10    | mov qword ptr ss:[rsp+10],rdx
+  // 00000001400186E5 | 48:894C24 08    | mov qword ptr ss:[rsp+8],rcx
+  // 00000001400186EA | 48:83EC 48      | sub rsp,48
+  // 00000001400186EE | 48:837C24 58 00 | cmp qword ptr ss:[rsp+58],0
+  // 00000001400186F4 | 74 10           | je <cff explorer.loc_140018706>
+  // 00000001400186F6 | 48:8B4C24 58    | mov rcx,qword ptr ss:[rsp+58]
+  // 00000001400186FB | E8 70000000     | call <cff explorer.ATL::ChTraitsCRT<wchar_t>::GetBaseTypeLength(char const *)>
+  pattern = "48 89 54 24 10 48 89 4C 24 08 48 83 EC ?? 48 83 7C 24 58 00 74 10 48 8B 4C 24 58 E8";
+  offset  = vu::find_pattern_A(mi.lpBaseOfDll, mi.SizeOfImage, pattern);
+  if (offset.first)
+  {
+    conv_ansi_to_unicode = vu::ulongptr(mi.lpBaseOfDll) + offset.second;
+  }
+  else
+  {
+    LOG("AOB conv_ansi_to_unicode(...) => FAILED");
+    return false;
+  }
+
+  // <cff_explorer.`QWORD grid_add_item(QWORD rcx, QWORD rdx)`
+  // 00000001400057D0 | 48:895424 10 | mov qword ptr ss:[rsp+10],rdx
+  // 00000001400057D5 | 48:894C24 08 | mov qword ptr ss:[rsp+8],rcx
+  // 00000001400057DA | 48:83EC 28   | sub rsp,28
+  // 00000001400057DE | 48:8B5424 38 | mov rdx,qword ptr ss:[rsp+38]
+  // 00000001400057E3 | 48:8B4C24 30 | mov rcx,qword ptr ss:[rsp+30]
+  // 00000001400057E8 | E8 C3020000  | call <ATL::CSimpleStringT<wchar_t,0>::operator=(wchar_t const *)>
+  // 00000001400057ED | 48:8B4424 30 | mov rax,qword ptr ss:[rsp+30]
+  pattern = "48 89 54 24 10 48 89 4C 24 08 48 83 EC ?? 48 8B 54 24 38 48 8B 4C 24 30 E8 C3 02 00 00 48 8B 44 24 30";
+  offset = vu::find_pattern_A(mi.lpBaseOfDll, mi.SizeOfImage, pattern);
+  if (offset.first)
+  {
+    grid_add_item = vu::ulongptr(mi.lpBaseOfDll) + offset.second;
+  }
+  else
+  {
+    LOG("AOB grid_add_item(...) => FAILED");
+    return false;
+  }
+
+  // <cff_explorer>.`LRESULT __fastcall CGridCtrl::SendMessageToParent(int nRow, int nCol, int nMessage)`
+  // 000000014014B1E0 | 44:894C24 20 | mov dword ptr ss:[rsp+20],r9d
+  // 000000014014B1E5 | 44:894424 18 | mov dword ptr ss:[rsp+18],r8d
+  // 000000014014B1EA | 895424 10    | mov dword ptr ss:[rsp+10],edx
+  // 000000014014B1EE | 48:894C24 08 | mov qword ptr ss:[rsp+8],rcx
+  // 000000014014B1F3 | 48:83EC 58   | sub rsp,58
+  // 000000014014B1F7 | 48:8B4C24 60 | mov rcx,qword ptr ss:[rsp+60]
+  // 000000014014B1FC | 48:8B49 40   | mov rcx,qword ptr ds:[rcx+40]
+  pattern = "44 89 4C 24 ?? 44 89 44 24 ?? 89 54 24 ?? 48 89 4C 24 ?? 48 83 EC ?? 48 8B 4C 24 60 48 8B 49 40";
+  offset  = vu::find_pattern_A(mi.lpBaseOfDll, mi.SizeOfImage, pattern);
+  if (offset.first)
+  {
+    CGridCtrl_SendMessageToParent = vu::ulongptr(mi.lpBaseOfDll) + offset.second;
+  }
+  else
+  {
+    LOG("AOB CGridCtrl::SendMessageToParent(...) => FAILED");
+    return false;
+  }
+
+  // <cff_explorer>.`CString* __fastcall CGridCtrl::GetItemText(QWORD* vtable_CGridCtrl, CString str, int nRow, int nCol)`
+  // 0000000140160680 | 44:894C24 20       | mov dword ptr ss:[rsp+20],r9d
+  // 0000000140160685 | 44:894424 18       | mov dword ptr ss:[rsp+18],r8d
+  // 000000014016068A | 48:895424 10       | mov qword ptr ss:[rsp+10],rdx
+  // 000000014016068F | 48:894C24 08       | mov qword ptr ss:[rsp+8],rcx
+  // 0000000140160694 | 48:83EC 38         | sub rsp,38
+  // 0000000140160698 | C74424 28 00000000 | mov dword ptr ss:[rsp+28],0
+  // 00000001401606A0 | 837C24 50 00       | cmp dword ptr ss:[rsp+50],0
+  // 00000001401606A5 | 7C 29              | jl <cff explorer.loc_1401606D0>
+  pattern = "44 89 4C 24 20 44 89 44 24 18 48 89 54 24 10 48 89 4C 24 08 48 83 EC ?? C7 44 24 28 00 00 00 00 83 7C 24 50 00 7C 29";
+  offset = vu::find_pattern_A(mi.lpBaseOfDll, mi.SizeOfImage, pattern);
+  if (offset.first)
+  {
+    CGridCtrl_GetItemText_Ex = CGridCtrl_GetItemText_t(vu::ulongptr(mi.lpBaseOfDll) + offset.second);
+  }
+  else
+  {
+    LOG("AOB CGridCtrl::GetItemText(...) => FAILED");
+    return false;
+  }
+
+  return true;
+}
+
 // Extension's Exportation Callback Functions
+
+bool g_hooking_succeed = false;
 
 CFF_API BOOL __cdecl ExtensionLoad(EXTINITDATA* pExtInitData)
 {
@@ -305,59 +406,50 @@ CFF_API BOOL __cdecl ExtensionLoad(EXTINITDATA* pExtInitData)
   SymInitialize(GetCurrentProcess(), NULL, TRUE);
   #endif // USE_DBGHELP
 
-  MODULEINFO mi = { 0 };
-  auto module = GetModuleHandle(nullptr);
-  GetModuleInformation(GetCurrentProcess(), module, &mi, sizeof(mi));
-  if (mi.lpBaseOfDll == 0 || mi.SizeOfImage == 0)
+  g_hooking_succeed = aob_find_addresses();
+
+  if (!g_hooking_succeed)
   {
-    return FALSE;
+    return false;
   }
 
-  // <cff_explorer.conv_ansi_to_unicode>
-  // 48:895424 10             | mov qword ptr ss:[rsp+10],rdx
-  // 48:894C24 08             | mov qword ptr ss:[rsp+8],rcx
-  // 48:83EC 48               | sub rsp,48
-  // 48:837C24 58 00          | cmp qword ptr ss:[rsp+58],0
-  // 74 10                    | je cff_explorer.<...>
-  // 48:8B4C24 58             | mov rcx,qword ptr ss:[rsp+58]
-  // E8 ?? ?? ?? ??           | call cff_explorer.<...>
-  const auto pattern = "48 89 54 24 10 48 89 4C 24 08 48 83 EC 48 48 83 7C 24 58 00 74 10 48 8B 4C 24 58 E8";
-  auto offset = vu::find_pattern_A(mi.lpBaseOfDll, mi.SizeOfImage, pattern);
-  if (!offset.first)
-  {
-    return FALSE;
-  }
+  g_hooking_succeed &= INLHooking[INL_Hooking::INL_conv_ansi_to_unicode].attach(
+    LPVOID(conv_ansi_to_unicode),
+    LPVOID(conv_ansi_to_unicode_hook),
+    (void**)&conv_ansi_to_unicode_backup);
 
-  conv_ansi_to_unicode = vu::ulongptr(mi.lpBaseOfDll) + offset.second;
+  g_hooking_succeed &= INLHooking[INL_Hooking::INL_grid_add_item].attach(
+    LPVOID(grid_add_item),
+    LPVOID(grid_add_item_hook),
+    (void**)&grid_add_item_backup);
 
-  bool result = true;
+  g_hooking_succeed &= INLHooking[INL_Hooking::INL_CGridCtrl_SendMessageToParent].attach(
+    LPVOID(CGridCtrl_SendMessageToParent),
+    LPVOID(CGridCtrl_SendMessageToParent_hook),
+    (void**)&CGridCtrl_SendMessageToParent_backup);
 
-  result &= INLHooking[INL_Hooking::INL_conv_ansi_to_unicode].attach(
-    LPVOID(conv_ansi_to_unicode), LPVOID(conv_ansi_to_unicode_hook), (void**)&conv_ansi_to_unicode_backup);
-
-  result &= INLHooking[INL_Hooking::INL_grid_add_item].attach(
-    LPVOID(grid_add_item), LPVOID(grid_add_item_hook), (void**)&grid_add_item_backup);
-
-  result &= INLHooking[INL_Hooking::INL_CGridCtrl_SendMessageToParent].attach(
-    LPVOID(CGridCtrl_SendMessageToParent), LPVOID(CGridCtrl_SendMessageToParent_hook), (void**)&CGridCtrl_SendMessageToParent_backup);
-
-  return result;
+  return g_hooking_succeed;
 }
 
 CFF_API VOID __cdecl ExtensionUnload()
 {
-  INLHooking[INL_Hooking::INL_conv_ansi_to_unicode].detach(
-    LPVOID(conv_ansi_to_unicode), (void**)&conv_ansi_to_unicode_backup);
+  #ifdef USE_DBGHELP
+  SymCleanup(GetCurrentProcess());
+  #endif // USE_DBGHELP
 
-  INLHooking[INL_Hooking::INL_grid_add_item].detach(
-    LPVOID(grid_add_item), (void**)&grid_add_item_backup);
+  if (!g_hooking_succeed)
+  {
+    return;
+  }
 
   INLHooking[INL_Hooking::INL_CGridCtrl_SendMessageToParent].detach(
     LPVOID(CGridCtrl_SendMessageToParent), (void**)&CGridCtrl_SendMessageToParent_backup);
 
-  #ifdef USE_DBGHELP
-  SymCleanup(GetCurrentProcess());
-  #endif // USE_DBGHELP
+  INLHooking[INL_Hooking::INL_grid_add_item].detach(
+    LPVOID(grid_add_item), (void**)&grid_add_item_backup);
+
+  INLHooking[INL_Hooking::INL_conv_ansi_to_unicode].detach(
+    LPVOID(conv_ansi_to_unicode), (void**)&conv_ansi_to_unicode_backup);
 }
 
 CFF_API WCHAR* __cdecl ExtensionName()
