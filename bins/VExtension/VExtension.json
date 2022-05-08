@@ -41,16 +41,6 @@
       "type": 0
     },
     {
-      "from": " ,",
-      "to": ",",
-      "type": 0
-    },
-    {
-      "from": ", ",
-      "to": ",",
-      "type": 0
-    },
-    {
       "from": "__ptr64",
       "to": "",
       "type": 0
@@ -71,12 +61,32 @@
       "type": 0
     },
     {
+      "from": " ,",
+      "to": ",",
+      "type": 0
+    },
+    {
+      "from": ", ",
+      "to": ",",
+      "type": 0
+    },
+    {
       "from": "<([ _\\d\\w]+),std::char_traits<([ _\\d\\w]+)>>",
       "to": "<$1>",
       "type": 1
     },
     {
-      "from": "basic_(streambuf|iostream|ostream|ios|istream|filebuf)",
+      "from": ",std::char_traits<[ _\\d\\w]+>",
+      "to": "",
+      "type": 1
+    },
+    {
+      "from": ",std::allocator<[ _\\d\\w]+>",
+      "to": "",
+      "type": 1
+    },
+    {
+      "from": "basic_(streambuf|iostream|ostream|ios|istream|filebuf|string)(<[ _\\d\\w]+>)?",
       "to": "$1",
       "type": 1
     },
@@ -88,6 +98,11 @@
     {
       "from": "(([_\\d\\w]+)<char\\>)",
       "to": "$2",
+      "type": 1
+    },
+    {
+      "from": ",std::allocator<[ \\:_\\d\\w]+>",
+      "to": "",
       "type": 1
     }
   ]
