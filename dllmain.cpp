@@ -27,6 +27,7 @@ static json g_prefs;
 extern "C" void get_rdx_register(QWORD& rdx);
 extern "C" void set_rdx_register(QWORD& rdx);
 
+bool g_hooking_succeed = false;
 static HINSTANCE hInstance = nullptr;
 static LRESULT CALLBACK DlgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
@@ -352,8 +353,6 @@ bool aob_find_addresses()
 }
 
 // Extension's Exportation Callback Functions
-
-bool g_hooking_succeed = false;
 
 std::string get_prefs_file_path()
 {
