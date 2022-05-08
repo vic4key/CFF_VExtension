@@ -23,7 +23,7 @@ _ _ _
 > ![](screenshots/undecorate-shorten-name.png?)
 > 
 > ![](screenshots/resolve-ordinal.png?)
->
+> 
 > ![](screenshots/prefs.png?)
 
 #### Development
