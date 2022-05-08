@@ -1,5 +1,10 @@
 {
-  "symbol_name_rules": [ // type (0: simple; 1: regex)
+  "options": {
+    "resolve_ordinal": true,
+    "undecorate_symbol": true,
+    "shorten_undecorated_symbol": true
+  },
+  "symbol_name_rules": [
     {
       "from": " * ",
       "to": "*",

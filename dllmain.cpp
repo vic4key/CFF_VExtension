@@ -6,6 +6,7 @@
 #include <psapi.h>
 #include "resource.h"
 #include "CFFExplorerSDK.h"
+#include "VExtension.Page.h"
 
 #define LOG(s) OutputDebugStringA("VExtension: " ## s)
 
@@ -17,19 +18,6 @@
 #include <dbghelp.h>
 #pragma comment(lib, "dbghelp.lib")
 #endif // USE_DBGHELP
-
-#include <json.hpp>
-#include <fifo_map.hpp>
-
-template<class K, class V, class dummy_compare, class A>
-using unordered_fifo_map = nlohmann::fifo_map<K, V, nlohmann::fifo_map_compare<K>, A>;
-using json = nlohmann::basic_json<unordered_fifo_map>;
-
-template <typename value_t>
-value_t json_get(const json& jobject, const std::string& name, const value_t def)
-{
-  return jobject.contains(name) ? jobject[name].get<value_t>() : def;
-}
 
 static json g_prefs;
 
@@ -110,28 +98,32 @@ QWORD __fastcall CGridCtrl_SendMessageToParent_hook(QWORD* vtable_CGridCtrl, int
     {
       g_ImportDirectory_Grid_IID_EOT_ENT.clear();
 
-      auto module_name = CGridCtrl_GetItemText(vtable_CGridCtrl, nRow, 0);
-      if (!module_name.empty())
+      bool resolve_ordinal = json_get_option(g_prefs, "resolve_ordinal", true);
+      if (resolve_ordinal)
       {
-        if (auto pBase = LoadLibraryExW(module_name.c_str(), nullptr, DONT_RESOLVE_DLL_REFERENCES))
+        auto module_name = CGridCtrl_GetItemText(vtable_CGridCtrl, nRow, 0);
+        if (!module_name.empty())
         {
-          if (auto pDOSHeader = PIMAGE_DOS_HEADER(pBase))
+          if (auto pBase = LoadLibraryExW(module_name.c_str(), nullptr, DONT_RESOLVE_DLL_REFERENCES))
           {
-            if (auto pNTHeaders = PIMAGE_NT_HEADERS(pDOSHeader->e_lfanew + vu::ulongptr(pDOSHeader)))
+            if (auto pDOSHeader = PIMAGE_DOS_HEADER(pBase))
             {
-              auto IED = pNTHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT];
-              if (IED.VirtualAddress != NULL && IED.Size != NULL)
+              if (auto pNTHeaders = PIMAGE_NT_HEADERS(pDOSHeader->e_lfanew + vu::ulongptr(pDOSHeader)))
               {
-                auto pIED = PIMAGE_EXPORT_DIRECTORY(PBYTE(pBase) + IED.VirtualAddress);
-                if (pIED != nullptr && pIED->AddressOfNames != NULL && pIED->AddressOfNameOrdinals != NULL)
+                auto IED = pNTHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT];
+                if (IED.VirtualAddress != NULL && IED.Size != NULL)
                 {
-                  auto pENT = PDWORD(PBYTE(pBase) + pIED->AddressOfNames); // Exported Name Table
-                  auto pEOT = PWORD(PBYTE(pBase) + pIED->AddressOfNameOrdinals); // Exported Ordinal Table
-                  for (DWORD i = 0; i < pIED->NumberOfNames; i++)
+                  auto pIED = PIMAGE_EXPORT_DIRECTORY(PBYTE(pBase) + IED.VirtualAddress);
+                  if (pIED != nullptr && pIED->AddressOfNames != NULL && pIED->AddressOfNameOrdinals != NULL)
                   {
-                    const auto ordinal = pEOT[i] + pIED->Base;
-                    const auto name = LPCSTR(PBYTE(pBase) + pENT[i]);
-                    g_ImportDirectory_Grid_IID_EOT_ENT[ordinal] = name;
+                    auto pENT = PDWORD(PBYTE(pBase) + pIED->AddressOfNames); // Exported Name Table
+                    auto pEOT = PWORD(PBYTE(pBase) + pIED->AddressOfNameOrdinals); // Exported Ordinal Table
+                    for (DWORD i = 0; i < pIED->NumberOfNames; i++)
+                    {
+                      const auto ordinal = pEOT[i] + pIED->Base;
+                      const auto name = LPCSTR(PBYTE(pBase) + pENT[i]);
+                      g_ImportDirectory_Grid_IID_EOT_ENT[ordinal] = name;
+                    }
                   }
                 }
               }
@@ -189,8 +181,11 @@ std::string update_symbol_name_for_friendly(const std::string& text)
 
 static QWORD update_rdx_resgiter()
 {
+  bool undecorate_symbol = json_get_option(g_prefs, "undecorate_symbol", true);
+  bool shorten_undecorated_symbol = json_get_option(g_prefs, "shorten_undecorated_symbol", true);
+
   std::string str = (char*)g_rdx;
-  if (vu::starts_with_A(str, "?"))
+  if (undecorate_symbol && vu::starts_with_A(str, "?"))
   {
     static char data[KiB] = { 0 };
     memset(data, 0, sizeof(data));
@@ -201,11 +196,14 @@ static QWORD update_rdx_resgiter()
     str = vu::undecorate_cpp_symbol_A(str);
     strcpy_s(data, str.c_str());
     #endif // USE_DBGHELP
-
     str.assign(data);
-    str = update_symbol_name_for_friendly(str);
-    memset(data, 0, sizeof(data));
-    strcpy_s(data, str.c_str());
+
+    if (shorten_undecorated_symbol)
+    {
+      str = update_symbol_name_for_friendly(str);
+      memset(data, 0, sizeof(data));
+      strcpy_s(data, str.c_str());
+    }
 
     g_rdx = QWORD(&data);
   }
@@ -357,22 +355,28 @@ bool aob_find_addresses()
 
 bool g_hooking_succeed = false;
 
+std::string get_prefs_file_path()
+{
+  char tmp[KiB] = { 0 };
+  GetModuleFileNameA(hInstance, tmp, sizeof(tmp));
+
+  auto file_dir = vu::extract_file_directory_A(tmp);
+  auto file_name = vu::extract_file_name_A(tmp, false) + ".json";
+
+  vu::PathA prefs_file;
+  prefs_file.join(file_dir).join(file_name).finalize();
+
+  return prefs_file.as_string();
+}
+
 CFF_API BOOL __cdecl ExtensionLoad(EXTINITDATA* pExtInitData)
 {
   CFF_Initialize(pExtInitData);
 
   try
   {
-    char tmp[KiB] = { 0 };
-    GetModuleFileNameA(hInstance, tmp, sizeof(tmp));
-
-    auto file_dir = vu::extract_file_directory_A(tmp);
-    auto file_name = vu::extract_file_name_A(tmp, false) + ".json";
-
-    vu::PathA prefs_file;
-    prefs_file.join(file_dir).join(file_name).finalize();
-
-    std::ifstream fs(prefs_file.as_string());
+    auto prefs_file_path = get_prefs_file_path();
+    std::ifstream fs(prefs_file_path);
     g_prefs = json::parse(fs, nullptr, true, true);
 
     g_symbol_name_rules.clear();
@@ -524,25 +528,8 @@ CFF_API VOID* __cdecl ExtensionExecute(LPARAM lParam)
 
 LRESULT CALLBACK DlgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 {
-  switch (uMsg)
-  {
-  case WM_INITDIALOG:
-    {
-      // do nothing
-    }
-    break;
-
-  case WM_COMMAND:
-    {
-      // do nothing
-    }
-    break;
-
-  default:
-    break;
-  }
-
-  return FALSE;
+  static VExtensionPage Page(g_prefs);
+  return Page.DlgProc(hWnd, uMsg, wParam, lParam);
 }
 
 BOOL APIENTRY DllMain(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved)

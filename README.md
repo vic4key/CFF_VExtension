@@ -14,7 +14,7 @@ _ _ _
 
 > Step 1. Install the required package [Redistributable 2019](https://aka.ms/vs/17/release/vc_redist.x64.exe) `(ignore if installed)`.
 > 
-> Step 2. Copy the [VExtension](bins/VExtension/) folder inside the `bins` folder to the `Explorer Suite\Extensions\CFF Explorer\` directory.
+> Step 2. Copy the [VExtension](bins/VExtension/) folder inside the `bins` folder to the `Explorer Suite\Extensions\CFF Explorer` directory.
 > 
 > Step 3. Enjoy.
 
@@ -23,6 +23,8 @@ _ _ _
 > ![](screenshots/undecorate-shorten-name.png?)
 > 
 > ![](screenshots/resolve-ordinal.png?)
+>
+> ![](screenshots/prefs.png?)
 
 #### Development
 
@@ -35,6 +37,8 @@ _ _ _
 #### TODO
 
 > - [ ] Release the `32-bit` version.
+> 
+> - [x] Add GUI for preferences.
 > 
 > - [x] Resolve symbol names for symbols that are imported by `Ordinal` if they are possible.
 > 

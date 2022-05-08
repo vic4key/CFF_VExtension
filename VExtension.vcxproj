@@ -179,9 +179,12 @@
     <ClInclude Include="CFFExplorerSDK.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="resource.h" />
+    <ClInclude Include="types.h" />
+    <ClInclude Include="VExtension.Page.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp" />
+    <ClCompile Include="VExtension.Page.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="VExtension.rc" />
