@@ -4,19 +4,15 @@ _ _ _
 
 #### Features
 
-> Undecorate the decorated C++ symbol names in the `Import/Export Directory` tab.
+> * Undecorate the decorated C++ symbol names in the `Import/Export Directory` tab.
 > 
-> Resolve symbol names for symbols that are imported by `Ordinal` in the `Import Directory` tab.
+> * Resolve symbol names for symbols that are imported by `Ordinal` in the `Import Directory` tab.
 > 
-> Shorten symbol name for several C++ libraries such as STL (you can easily modify or add more rules in the configuration file [VExtension.json](bins/VExtension/VExtension.json)).
+> * Shorten symbol name for several C++ libraries such as STL (you can easily modify or add more rules in the configuration file [VExtension.json](bins/VExtension/VExtension.json)).
 
 #### Usage
 
-> Step 1. Install the required package [Redistributable 2019](https://aka.ms/vs/17/release/vc_redist.x64.exe) `(ignore if installed)`.
-> 
-> Step 2. Copy the [VExtension](bins/VExtension/) folder inside the `bins` folder to the `Explorer Suite\Extensions\CFF Explorer` directory.
-> 
-> Step 3. Enjoy.
+> Copy the [VExtension](bins/VExtension/) folder inside the `bins` folder to the `Explorer Suite\Extensions\CFF Explorer` directory.
 
 #### Screenshots
 
@@ -24,7 +20,7 @@ _ _ _
 > 
 > ![](screenshots/resolve-ordinal.png?)
 > 
-> ![](screenshots/prefs.png?)
+> ![](screenshots/options.png?)
 
 #### Development
 
@@ -38,7 +34,7 @@ _ _ _
 
 > - [ ] Release the `32-bit` version.
 > 
-> - [x] Add GUI for preferences.
+> - [x] Add GUI for options.
 > 
 > - [x] Resolve symbol names for symbols that are imported by `Ordinal` if they are possible.
 > 
