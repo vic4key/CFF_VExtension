@@ -266,7 +266,7 @@ bool aob_find_addresses()
   }
 
   std::string pattern;
-  std::pair<bool, size_t> offset(false, -1);
+  std::vector<size_t> offsets;
 
   // <cff_explorer>.`QWORD conv_ansi_to_unicode(QWORD rcx, QWORD rdx)`
   // 00000001400186E0 | 48:895424 10    | mov qword ptr ss:[rsp+10],rdx
@@ -277,10 +277,10 @@ bool aob_find_addresses()
   // 00000001400186F6 | 48:8B4C24 58    | mov rcx,qword ptr ss:[rsp+58]
   // 00000001400186FB | E8 70000000     | call <cff explorer.ATL::ChTraitsCRT<wchar_t>::GetBaseTypeLength(char const *)>
   pattern = "48 89 54 24 10 48 89 4C 24 08 48 83 EC ?? 48 83 7C 24 58 00 74 10 48 8B 4C 24 58 E8";
-  offset  = vu::find_pattern_A(mi.lpBaseOfDll, mi.SizeOfImage, pattern);
-  if (offset.first)
+  offsets = vu::find_pattern_A(mi.lpBaseOfDll, mi.SizeOfImage, pattern, true);
+  if (!offsets.empty())
   {
-    conv_ansi_to_unicode = vu::ulongptr(mi.lpBaseOfDll) + offset.second;
+    conv_ansi_to_unicode = vu::ulongptr(mi.lpBaseOfDll) + offsets.front();
   }
   else
   {
@@ -297,10 +297,10 @@ bool aob_find_addresses()
   // 00000001400057E8 | E8 C3020000  | call <ATL::CSimpleStringT<wchar_t,0>::operator=(wchar_t const *)>
   // 00000001400057ED | 48:8B4424 30 | mov rax,qword ptr ss:[rsp+30]
   pattern = "48 89 54 24 10 48 89 4C 24 08 48 83 EC ?? 48 8B 54 24 38 48 8B 4C 24 30 E8 C3 02 00 00 48 8B 44 24 30";
-  offset = vu::find_pattern_A(mi.lpBaseOfDll, mi.SizeOfImage, pattern);
-  if (offset.first)
+  offsets = vu::find_pattern_A(mi.lpBaseOfDll, mi.SizeOfImage, pattern, true);
+  if (!offsets.empty())
   {
-    grid_add_item = vu::ulongptr(mi.lpBaseOfDll) + offset.second;
+    grid_add_item = vu::ulongptr(mi.lpBaseOfDll) + offsets.front();
   }
   else
   {
@@ -317,10 +317,10 @@ bool aob_find_addresses()
   // 000000014014B1F7 | 48:8B4C24 60 | mov rcx,qword ptr ss:[rsp+60]
   // 000000014014B1FC | 48:8B49 40   | mov rcx,qword ptr ds:[rcx+40]
   pattern = "44 89 4C 24 ?? 44 89 44 24 ?? 89 54 24 ?? 48 89 4C 24 ?? 48 83 EC ?? 48 8B 4C 24 60 48 8B 49 40";
-  offset  = vu::find_pattern_A(mi.lpBaseOfDll, mi.SizeOfImage, pattern);
-  if (offset.first)
+  offsets = vu::find_pattern_A(mi.lpBaseOfDll, mi.SizeOfImage, pattern, true);
+  if (!offsets.empty())
   {
-    CGridCtrl_SendMessageToParent = vu::ulongptr(mi.lpBaseOfDll) + offset.second;
+    CGridCtrl_SendMessageToParent = vu::ulongptr(mi.lpBaseOfDll) + offsets.front();
   }
   else
   {
@@ -338,10 +338,10 @@ bool aob_find_addresses()
   // 00000001401606A0 | 837C24 50 00       | cmp dword ptr ss:[rsp+50],0
   // 00000001401606A5 | 7C 29              | jl <cff explorer.loc_1401606D0>
   pattern = "44 89 4C 24 20 44 89 44 24 18 48 89 54 24 10 48 89 4C 24 08 48 83 EC ?? C7 44 24 28 00 00 00 00 83 7C 24 50 00 7C 29";
-  offset = vu::find_pattern_A(mi.lpBaseOfDll, mi.SizeOfImage, pattern);
-  if (offset.first)
+  offsets = vu::find_pattern_A(mi.lpBaseOfDll, mi.SizeOfImage, pattern, true);
+  if (!offsets.empty())
   {
-    CGridCtrl_GetItemText_Ex = CGridCtrl_GetItemText_t(vu::ulongptr(mi.lpBaseOfDll) + offset.second);
+    CGridCtrl_GetItemText_Ex = CGridCtrl_GetItemText_t(vu::ulongptr(mi.lpBaseOfDll) + offsets.front());
   }
   else
   {
