@@ -93,9 +93,9 @@ QWORD __fastcall CGridCtrl_SendMessageToParent_hook(QWORD* vtable_CGridCtrl, int
     // auto s = CGridCtrl_GetItemText(vtable_CGridCtrl, nRow, nCol);
     // OutputDebugStringW(s.c_str());
 
-    auto ID = CWnd_GetDlgCtrlID(vtable_CGridCtrl);
-    const UINT ImportDirectory_Grid_IID_ID = 1006;
-    if (ID == ImportDirectory_Grid_IID_ID)
+    const auto ID = CWnd_GetDlgCtrlID(vtable_CGridCtrl);
+    const UINT ImportExportDirectory_Above_Grid_ID = 1006;
+    if (ID == ImportExportDirectory_Above_Grid_ID)
     {
       g_ImportDirectory_Grid_IID_EOT_ENT.clear();
 
@@ -255,7 +255,7 @@ static QWORD grid_add_item_hook(QWORD rcx, QWORD rdx)
   return grid_add_item_backup(rcx, rdx);
 }
 
-bool aob_find_addresses()
+bool find_addresses()
 {
   MODULEINFO mi = { 0 };
   auto module = GetModuleHandle(nullptr);
@@ -265,10 +265,10 @@ bool aob_find_addresses()
     return false;
   }
 
-  std::string pattern;
-  std::vector<size_t> offsets;
+  const auto base_address = vu::ulongptr(mi.lpBaseOfDll);
 
   // <cff_explorer>.`QWORD conv_ansi_to_unicode(QWORD rcx, QWORD rdx)`
+  // pattern = "48 89 54 24 10 48 89 4C 24 08 48 83 EC ?? 48 83 7C 24 58 00 74 10 48 8B 4C 24 58 E8";
   // 00000001400186E0 | 48:895424 10    | mov qword ptr ss:[rsp+10],rdx
   // 00000001400186E5 | 48:894C24 08    | mov qword ptr ss:[rsp+8],rcx
   // 00000001400186EA | 48:83EC 48      | sub rsp,48
@@ -276,19 +276,10 @@ bool aob_find_addresses()
   // 00000001400186F4 | 74 10           | je <cff explorer.loc_140018706>
   // 00000001400186F6 | 48:8B4C24 58    | mov rcx,qword ptr ss:[rsp+58]
   // 00000001400186FB | E8 70000000     | call <cff explorer.ATL::ChTraitsCRT<wchar_t>::GetBaseTypeLength(char const *)>
-  pattern = "48 89 54 24 10 48 89 4C 24 08 48 83 EC ?? 48 83 7C 24 58 00 74 10 48 8B 4C 24 58 E8";
-  offsets = vu::find_pattern_A(mi.lpBaseOfDll, mi.SizeOfImage, pattern, true);
-  if (!offsets.empty())
-  {
-    conv_ansi_to_unicode = vu::ulongptr(mi.lpBaseOfDll) + offsets.front();
-  }
-  else
-  {
-    LOG("AOB conv_ansi_to_unicode(...) => FAILED");
-    return false;
-  }
+  conv_ansi_to_unicode = base_address + 0x186e0;
 
   // <cff_explorer>.`QWORD grid_add_item(QWORD rcx, QWORD rdx)`
+  // pattern = "48 89 54 24 10 48 89 4C 24 08 48 83 EC ?? 48 8B 54 24 38 48 8B 4C 24 30 E8 C3 02 00 00 48 8B 44 24 30";
   // 00000001400057D0 | 48:895424 10 | mov qword ptr ss:[rsp+10],rdx
   // 00000001400057D5 | 48:894C24 08 | mov qword ptr ss:[rsp+8],rcx
   // 00000001400057DA | 48:83EC 28   | sub rsp,28
@@ -296,19 +287,10 @@ bool aob_find_addresses()
   // 00000001400057E3 | 48:8B4C24 30 | mov rcx,qword ptr ss:[rsp+30]
   // 00000001400057E8 | E8 C3020000  | call <ATL::CSimpleStringT<wchar_t,0>::operator=(wchar_t const *)>
   // 00000001400057ED | 48:8B4424 30 | mov rax,qword ptr ss:[rsp+30]
-  pattern = "48 89 54 24 10 48 89 4C 24 08 48 83 EC ?? 48 8B 54 24 38 48 8B 4C 24 30 E8 C3 02 00 00 48 8B 44 24 30";
-  offsets = vu::find_pattern_A(mi.lpBaseOfDll, mi.SizeOfImage, pattern, true);
-  if (!offsets.empty())
-  {
-    grid_add_item = vu::ulongptr(mi.lpBaseOfDll) + offsets.front();
-  }
-  else
-  {
-    LOG("AOB grid_add_item(...) => FAILED");
-    return false;
-  }
+  grid_add_item = base_address + 0x57d0;
 
   // <cff_explorer>.`LRESULT __fastcall CGridCtrl::SendMessageToParent(int nRow, int nCol, int nMessage)`
+  // pattern = "44 89 4C 24 ?? 44 89 44 24 ?? 89 54 24 ?? 48 89 4C 24 ?? 48 83 EC ?? 48 8B 4C 24 60 48 8B 49 40";
   // 000000014014B1E0 | 44:894C24 20 | mov dword ptr ss:[rsp+20],r9d
   // 000000014014B1E5 | 44:894424 18 | mov dword ptr ss:[rsp+18],r8d
   // 000000014014B1EA | 895424 10    | mov dword ptr ss:[rsp+10],edx
@@ -316,19 +298,10 @@ bool aob_find_addresses()
   // 000000014014B1F3 | 48:83EC 58   | sub rsp,58
   // 000000014014B1F7 | 48:8B4C24 60 | mov rcx,qword ptr ss:[rsp+60]
   // 000000014014B1FC | 48:8B49 40   | mov rcx,qword ptr ds:[rcx+40]
-  pattern = "44 89 4C 24 ?? 44 89 44 24 ?? 89 54 24 ?? 48 89 4C 24 ?? 48 83 EC ?? 48 8B 4C 24 60 48 8B 49 40";
-  offsets = vu::find_pattern_A(mi.lpBaseOfDll, mi.SizeOfImage, pattern, true);
-  if (!offsets.empty())
-  {
-    CGridCtrl_SendMessageToParent = vu::ulongptr(mi.lpBaseOfDll) + offsets.front();
-  }
-  else
-  {
-    LOG("AOB CGridCtrl::SendMessageToParent(...) => FAILED");
-    return false;
-  }
+  CGridCtrl_SendMessageToParent = base_address + 0x14b1e0;
 
   // <cff_explorer>.`CString* __fastcall CGridCtrl::GetItemText(QWORD* vtable_CGridCtrl, CString str, int nRow, int nCol)`
+  // pattern = "44 89 4C 24 20 44 89 44 24 18 48 89 54 24 10 48 89 4C 24 08 48 83 EC ?? C7 44 24 28 00 00 00 00 83 7C 24 50 00 7C 29";
   // 0000000140160680 | 44:894C24 20       | mov dword ptr ss:[rsp+20],r9d
   // 0000000140160685 | 44:894424 18       | mov dword ptr ss:[rsp+18],r8d
   // 000000014016068A | 48:895424 10       | mov qword ptr ss:[rsp+10],rdx
@@ -337,17 +310,7 @@ bool aob_find_addresses()
   // 0000000140160698 | C74424 28 00000000 | mov dword ptr ss:[rsp+28],0
   // 00000001401606A0 | 837C24 50 00       | cmp dword ptr ss:[rsp+50],0
   // 00000001401606A5 | 7C 29              | jl <cff explorer.loc_1401606D0>
-  pattern = "44 89 4C 24 20 44 89 44 24 18 48 89 54 24 10 48 89 4C 24 08 48 83 EC ?? C7 44 24 28 00 00 00 00 83 7C 24 50 00 7C 29";
-  offsets = vu::find_pattern_A(mi.lpBaseOfDll, mi.SizeOfImage, pattern, true);
-  if (!offsets.empty())
-  {
-    CGridCtrl_GetItemText_Ex = CGridCtrl_GetItemText_t(vu::ulongptr(mi.lpBaseOfDll) + offsets.front());
-  }
-  else
-  {
-    LOG("AOB CGridCtrl::GetItemText(...) => FAILED");
-    return false;
-  }
+  CGridCtrl_GetItemText_Ex = CGridCtrl_GetItemText_t(base_address + 0x160680);
 
   return true;
 }
@@ -406,7 +369,7 @@ CFF_API BOOL __cdecl ExtensionLoad(EXTINITDATA* pExtInitData)
   SymInitialize(GetCurrentProcess(), NULL, TRUE);
   #endif // USE_DBGHELP
 
-  g_hooking_succeed = aob_find_addresses();
+  g_hooking_succeed = find_addresses();
 
   if (!g_hooking_succeed)
   {
@@ -489,7 +452,7 @@ CFF_API BOOL __cdecl ExtensionNeeded(VOID* pObject, UINT uSize)
     }
 
     if (pNTHeaders->OptionalHeader.Magic != IMAGE_NT_OPTIONAL_HDR32_MAGIC &&
-      pNTHeaders->OptionalHeader.Magic != IMAGE_NT_OPTIONAL_HDR64_MAGIC)
+        pNTHeaders->OptionalHeader.Magic != IMAGE_NT_OPTIONAL_HDR64_MAGIC)
     {
       return FALSE;
     }
