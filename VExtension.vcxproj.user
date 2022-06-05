@@ -10,4 +10,7 @@
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
     <LocalDebuggerCommand>C:\Program Files\NTCore\Explorer Suite\CFF Explorer.exe</LocalDebuggerCommand>
   </PropertyGroup>
+  <PropertyGroup>
+    <RESOURCE_FILE>VExtension.rc</RESOURCE_FILE>
+  </PropertyGroup>
 </Project>

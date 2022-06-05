@@ -2,7 +2,8 @@
   "options": {
     "resolve_ordinal": true,
     "undecorate_symbol": true,
-    "shorten_undecorated_symbol": true
+    "shorten_undecorated_symbol": true,
+    "auto_expand_name_column_width": true
   },
   "symbol_name_rules": [
     {

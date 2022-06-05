@@ -16,4 +16,5 @@ private:
   HWND  m_option_resolve_ordinal;
   HWND  m_option_undecorate_symbol;
   HWND  m_option_shorten_undecorated_symbol;
+  HWND  m_option_auto_expand_last_column;
 };
