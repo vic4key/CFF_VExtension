@@ -27,6 +27,15 @@ static json g_prefs;
 extern "C" void get_rdx_register(QWORD& rdx);
 extern "C" void set_rdx_register(QWORD& rdx);
 
+// Global - Types & Constants & Variables
+
+typedef void* CWnd;
+
+CWnd* ImportExportDirectory_Below_Grid = NULL;
+
+const UINT ImportExportDirectory_Above_Grid_ID = 1006;
+const UINT ImportExportDirectory_Below_Grid_ID = 1007;
+
 bool g_hooking_succeed = false;
 static HINSTANCE hInstance = nullptr;
 static LRESULT CALLBACK DlgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
@@ -36,12 +45,11 @@ enum INL_Hooking
   INL_conv_ansi_to_unicode,
   INL_grid_add_item,
   INL_CGridCtrl_SendMessageToParent,
+  INL_CGridCtrl_OnSize,
   Count,
 };
 
 vu::INLHooking INLHooking[INL_Hooking::Count];
-
-typedef void* CWnd;
 
 // UINT CWnd::GetDlgCtrlID(CWnd* pWnd)
 
@@ -50,6 +58,45 @@ UINT CWnd_GetDlgCtrlID(CWnd* pWnd)
   const ULONG_PTR Offset_MFC_CWnd_m_hWnd = 0x8;
   HWND hWnd = HWND(*(QWORD*)(pWnd + Offset_MFC_CWnd_m_hWnd));
   return GetDlgCtrlID(hWnd);
+}
+
+// void CGridCtrl::ExpandLastColumn()
+
+typedef void (__fastcall *CGridCtrl_ExpandLastColumn_t)(CWnd* pWnd);
+static CGridCtrl_ExpandLastColumn_t CGridCtrl_ExpandLastColumn = NULL;
+
+void CGridCtrl_ExpandLastColumn_Ex(CWnd* pWnd)
+{
+  if (CGridCtrl_ExpandLastColumn == nullptr)
+  {
+    return;
+  }
+
+  const auto ID = CWnd_GetDlgCtrlID(pWnd);
+  if (ID != ImportExportDirectory_Below_Grid_ID)
+  {
+    return;
+  }
+
+  CGridCtrl_ExpandLastColumn(pWnd);
+}
+
+// void CGridCtrl::OnSize(UINT nType, int cx, int cy)
+
+typedef void (__fastcall *CGridCtrl_OnSize_t)(CWnd* pWnd, unsigned int nType, unsigned int cx, unsigned int cy);
+static CGridCtrl_OnSize_t CGridCtrl_OnSize_backup = NULL;
+static CGridCtrl_OnSize_t CGridCtrl_OnSize = NULL;
+
+void __fastcall CGridCtrl_OnSize_hook(CWnd* pWnd, unsigned int nType, unsigned int cx, unsigned int cy)
+{
+  CGridCtrl_OnSize_backup(pWnd, nType, cx, cy);
+
+  const auto ID = CWnd_GetDlgCtrlID(pWnd);
+  if (ID == ImportExportDirectory_Below_Grid_ID)
+  {
+    ImportExportDirectory_Below_Grid = pWnd;
+    CGridCtrl_ExpandLastColumn_Ex(pWnd);
+  }
 }
 
 // CString __fastcall CGridCtrl::GetItemText(int nRow, int nCol)
@@ -91,12 +138,13 @@ QWORD __fastcall CGridCtrl_SendMessageToParent_hook(CWnd* pWnd, int nRow, int nC
   const UINT GVN_SELCHANGING = 0xFFFFFF9C;
   if (nMessage == GVN_SELCHANGING && nRow >= 0 && nCol >= 0)
   {
-    // get the text of the selected cell
-    // auto s = CGridCtrl_GetItemText(pWnd, nRow, nCol);
-    // OutputDebugStringW(s.c_str());
-
     const auto ID = CWnd_GetDlgCtrlID(pWnd);
-    const UINT ImportExportDirectory_Above_Grid_ID = 1006;
+
+    if (ID == ImportExportDirectory_Below_Grid_ID)
+    {
+      ImportExportDirectory_Below_Grid = pWnd;
+    }
+
     if (ID == ImportExportDirectory_Above_Grid_ID)
     {
       g_ImportDirectory_Grid_IID_EOT_ENT.clear();
@@ -137,7 +185,11 @@ QWORD __fastcall CGridCtrl_SendMessageToParent_hook(CWnd* pWnd, int nRow, int nC
     }
   }
 
-  return CGridCtrl_SendMessageToParent_backup(pWnd, nRow, nCol, nMessage);
+  auto result = CGridCtrl_SendMessageToParent_backup(pWnd, nRow, nCol, nMessage);
+
+  CGridCtrl_ExpandLastColumn_Ex(ImportExportDirectory_Below_Grid);
+
+  return result;
 }
 
 // QWORD conv_ansi_to_unicode(QWORD rcx, QWORD rdx)
@@ -291,7 +343,7 @@ bool find_addresses()
   // 00000001400057ED | 48:8B4424 30 | mov rax,qword ptr ss:[rsp+30]
   grid_add_item = base_address + 0x57d0;
 
-  // <cff_explorer>.`LRESULT __fastcall CGridCtrl::SendMessageToParent(int nRow, int nCol, int nMessage)`
+  // <cff_explorer>.`LRESULT CGridCtrl::SendMessageToParent(int nRow, int nCol, int nMessage)`
   // pattern = "44 89 4C 24 ?? 44 89 44 24 ?? 89 54 24 ?? 48 89 4C 24 ?? 48 83 EC ?? 48 8B 4C 24 60 48 8B 49 40";
   // 000000014014B1E0 | 44:894C24 20 | mov dword ptr ss:[rsp+20],r9d
   // 000000014014B1E5 | 44:894424 18 | mov dword ptr ss:[rsp+18],r8d
@@ -302,7 +354,7 @@ bool find_addresses()
   // 000000014014B1FC | 48:8B49 40   | mov rcx,qword ptr ds:[rcx+40]
   CGridCtrl_SendMessageToParent = base_address + 0x14b1e0;
 
-  // <cff_explorer>.`CString* __fastcall CGridCtrl::GetItemText(CWnd* pWnd, CString str, int nRow, int nCol)`
+  // <cff_explorer>.`CString CGridCtrl::GetItemText(CString str, int nRow, int nCol)`
   // pattern = "44 89 4C 24 20 44 89 44 24 18 48 89 54 24 10 48 89 4C 24 08 48 83 EC ?? C7 44 24 28 00 00 00 00 83 7C 24 50 00 7C 29";
   // 0000000140160680 | 44:894C24 20       | mov dword ptr ss:[rsp+20],r9d
   // 0000000140160685 | 44:894424 18       | mov dword ptr ss:[rsp+18],r8d
@@ -313,6 +365,27 @@ bool find_addresses()
   // 00000001401606A0 | 837C24 50 00       | cmp dword ptr ss:[rsp+50],0
   // 00000001401606A5 | 7C 29              | jl <cff explorer.loc_1401606D0>
   CGridCtrl_GetItemText_Ex = CGridCtrl_GetItemText_t(base_address + 0x160680);
+
+  // <cff_explorer>.`void CGridCtrl::ExpandLastColumn()`
+  // pattern = "48 89 4C 24 ?? 48 83 EC ?? 48 8B 4C 24 ?? E8 ?? ?? ?? ?? 85 C0 7F 05 E9 ?? ?? ?? ?? 48"
+  // 0000000140159060 | 48:894C24 08 | mov qword ptr ss:[rsp+8],rcx
+  // 0000000140159065 | 48:83EC 58   | sub rsp,58
+  // 0000000140159069 | 48:8B4C24 60 | mov rcx,qword ptr ss:[rsp+60]
+  // 000000014015906E | E8 4DC4ECFF  | call <cff explorer.CGridCtrl_GetColumnCount>
+  // 0000000140159073 | 85C0         | test eax,eax
+  // 0000000140159075 | 7F 05        | jg <cff explorer.loc_14015907C>
+  // 0000000140159077 | E9 DD000000  | jmp <cff explorer.loc_140159159>
+  // 000000014015907C | 48:8B4C24 60 | mov rcx,qword ptr ss:[rsp+60]
+  CGridCtrl_ExpandLastColumn = CGridCtrl_ExpandLastColumn_t(base_address + 0x159060);
+
+  // <cff_explorer>.`void CGridCtrl::OnSize(UINT nType, int cx, int cy)`
+  // 000000014014BA70 | 44:894C24 20     | mov dword ptr ss:[rsp+20],r9d
+  // 000000014014BA75 | 44:894424 18     | mov dword ptr ss:[rsp+18],r8d
+  // 000000014014BA7A | 895424 10        | mov dword ptr ss:[rsp+10],edx
+  // 000000014014BA7E | 48:894C24 08     | mov qword ptr ss:[rsp+8],rcx
+  // 000000014014BA83 | 48:83EC 28       | sub rsp,28
+  // 000000014014BA87 | 833D 823F1500 00 | cmp dword ptr ds:[<bAlreadyInsideThisProcedure>],0
+  CGridCtrl_OnSize = CGridCtrl_OnSize_t(base_address + 0x14BA70);
 
   return true;
 }
@@ -393,6 +466,11 @@ CFF_API BOOL __cdecl ExtensionLoad(EXTINITDATA* pExtInitData)
     LPVOID(CGridCtrl_SendMessageToParent_hook),
     (void**)&CGridCtrl_SendMessageToParent_backup);
 
+  g_hooking_succeed &= INLHooking[INL_Hooking::INL_CGridCtrl_OnSize].attach(
+    LPVOID(CGridCtrl_OnSize),
+    LPVOID(CGridCtrl_OnSize_hook),
+    (void**)&CGridCtrl_OnSize_backup);
+
   return g_hooking_succeed;
 }
 
@@ -406,6 +484,9 @@ CFF_API VOID __cdecl ExtensionUnload()
   {
     return;
   }
+
+  INLHooking[INL_Hooking::INL_CGridCtrl_OnSize].detach(
+    LPVOID(CGridCtrl_OnSize), (void**)&CGridCtrl_OnSize_backup);
 
   INLHooking[INL_Hooking::INL_CGridCtrl_SendMessageToParent].detach(
     LPVOID(CGridCtrl_SendMessageToParent), (void**)&CGridCtrl_SendMessageToParent_backup);
