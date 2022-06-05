@@ -51,12 +51,29 @@ enum INL_Hooking
 
 vu::INLHooking INLHooking[INL_Hooking::Count];
 
+// UINT CWnd::GetSafeHwnd(CWnd* pWnd)
+
+HWND CWnd_GetSafeHwnd(CWnd* pWnd)
+{
+  if (pWnd == nullptr)
+  {
+    return nullptr;
+  }
+
+  const ULONG_PTR Offset_MFC_CWnd_m_hWnd = 0x8;
+  return HWND(*(QWORD*)(pWnd + Offset_MFC_CWnd_m_hWnd));
+}
+
 // UINT CWnd::GetDlgCtrlID(CWnd* pWnd)
 
 UINT CWnd_GetDlgCtrlID(CWnd* pWnd)
 {
-  const ULONG_PTR Offset_MFC_CWnd_m_hWnd = 0x8;
-  HWND hWnd = HWND(*(QWORD*)(pWnd + Offset_MFC_CWnd_m_hWnd));
+  HWND hWnd = CWnd_GetSafeHwnd(pWnd);
+  if (hWnd == nullptr)
+  {
+    return -1;
+  }
+
   return GetDlgCtrlID(hWnd);
 }
 
@@ -68,6 +85,12 @@ static CGridCtrl_ExpandLastColumn_t CGridCtrl_ExpandLastColumn = NULL;
 void CGridCtrl_ExpandLastColumn_Ex(CWnd* pWnd)
 {
   if (CGridCtrl_ExpandLastColumn == nullptr)
+  {
+    return;
+  }
+
+  auto hWnd = CWnd_GetSafeHwnd(pWnd);
+  if (!IsWindow(hWnd))
   {
     return;
   }
@@ -99,7 +122,10 @@ void __fastcall CGridCtrl_OnSize_hook(CWnd* pWnd, unsigned int nType, unsigned i
     bool auto_expand_last_column = json_get_option(g_prefs, "auto_expand_name_column_width", true);
     if (auto_expand_last_column)
     {
-      CGridCtrl_ExpandLastColumn_Ex(pWnd);
+      vu::Debouncer::instance().debounce(ImportExportDirectory_Below_Grid_ID, 100, [&]() // 100ms
+      {
+        CGridCtrl_ExpandLastColumn_Ex(ImportExportDirectory_Below_Grid);
+      });
     }
   }
 }
