@@ -41,12 +41,14 @@ enum INL_Hooking
 
 vu::INLHooking INLHooking[INL_Hooking::Count];
 
-// UINT CWnd::GetDlgCtrlID(QWORD* vtable)
+typedef void* CWnd;
 
-UINT CWnd_GetDlgCtrlID(QWORD* vtable)
+// UINT CWnd::GetDlgCtrlID(CWnd* pWnd)
+
+UINT CWnd_GetDlgCtrlID(CWnd* pWnd)
 {
   const ULONG_PTR Offset_MFC_CWnd_m_hWnd = 0x8;
-  HWND hWnd = HWND(*(QWORD*)(vtable + Offset_MFC_CWnd_m_hWnd));
+  HWND hWnd = HWND(*(QWORD*)(pWnd + Offset_MFC_CWnd_m_hWnd));
   return GetDlgCtrlID(hWnd);
 }
 
@@ -66,34 +68,34 @@ struct CString
   }
 };
 
-typedef CString* (__fastcall* CGridCtrl_GetItemText_t)(QWORD* vtable_CGridCtrl, CString str, int nRow, int nCol);
+typedef CString* (__fastcall *CGridCtrl_GetItemText_t)(CWnd* pWnd, CString str, int nRow, int nCol);
 static CGridCtrl_GetItemText_t CGridCtrl_GetItemText_Ex = NULL;
 
-std::wstring CGridCtrl_GetItemText(QWORD* vtable_CGridCtrl, int nRow, int nCol)
+std::wstring CGridCtrl_GetItemText(CWnd* pWnd, int nRow, int nCol)
 {
   static CString s;
-  auto result = CGridCtrl_GetItemText_Ex(vtable_CGridCtrl, s, nRow, nCol);
+  auto result = CGridCtrl_GetItemText_Ex(pWnd, s, nRow, nCol);
   return result->c_str();
 }
 
 // LRESULT CGridCtrl::SendMessageToParent(int nRow, int nCol, int nMessage) const
 
-typedef QWORD (__fastcall *CGridCtrl_SendMessageToParent_t)(QWORD* vtable_CGridCtrl, int nRow, int nCol, int nMessage);
+typedef QWORD (__fastcall *CGridCtrl_SendMessageToParent_t)(CWnd* pWnd, int nRow, int nCol, int nMessage);
 static CGridCtrl_SendMessageToParent_t CGridCtrl_SendMessageToParent_backup = NULL;
 static vu::ulongptr CGridCtrl_SendMessageToParent = NULL;
 
 std::unordered_map<DWORD, LPCSTR> g_ImportDirectory_Grid_IID_EOT_ENT; // mapping of Exported Ordinal Table and Exported Name Table
 
-QWORD __fastcall CGridCtrl_SendMessageToParent_hook(QWORD* vtable_CGridCtrl, int nRow, int nCol, int nMessage)
+QWORD __fastcall CGridCtrl_SendMessageToParent_hook(CWnd* pWnd, int nRow, int nCol, int nMessage)
 {
   const UINT GVN_SELCHANGING = 0xFFFFFF9C;
   if (nMessage == GVN_SELCHANGING && nRow >= 0 && nCol >= 0)
   {
     // get the text of the selected cell
-    // auto s = CGridCtrl_GetItemText(vtable_CGridCtrl, nRow, nCol);
+    // auto s = CGridCtrl_GetItemText(pWnd, nRow, nCol);
     // OutputDebugStringW(s.c_str());
 
-    const auto ID = CWnd_GetDlgCtrlID(vtable_CGridCtrl);
+    const auto ID = CWnd_GetDlgCtrlID(pWnd);
     const UINT ImportExportDirectory_Above_Grid_ID = 1006;
     if (ID == ImportExportDirectory_Above_Grid_ID)
     {
@@ -102,7 +104,7 @@ QWORD __fastcall CGridCtrl_SendMessageToParent_hook(QWORD* vtable_CGridCtrl, int
       bool resolve_ordinal = json_get_option(g_prefs, "resolve_ordinal", true);
       if (resolve_ordinal)
       {
-        auto module_name = CGridCtrl_GetItemText(vtable_CGridCtrl, nRow, 0);
+        auto module_name = CGridCtrl_GetItemText(pWnd, nRow, 0);
         if (!module_name.empty())
         {
           if (auto pBase = LoadLibraryExW(module_name.c_str(), nullptr, DONT_RESOLVE_DLL_REFERENCES))
@@ -135,7 +137,7 @@ QWORD __fastcall CGridCtrl_SendMessageToParent_hook(QWORD* vtable_CGridCtrl, int
     }
   }
 
-  return CGridCtrl_SendMessageToParent_backup(vtable_CGridCtrl, nRow, nCol, nMessage);
+  return CGridCtrl_SendMessageToParent_backup(pWnd, nRow, nCol, nMessage);
 }
 
 // QWORD conv_ansi_to_unicode(QWORD rcx, QWORD rdx)
@@ -300,7 +302,7 @@ bool find_addresses()
   // 000000014014B1FC | 48:8B49 40   | mov rcx,qword ptr ds:[rcx+40]
   CGridCtrl_SendMessageToParent = base_address + 0x14b1e0;
 
-  // <cff_explorer>.`CString* __fastcall CGridCtrl::GetItemText(QWORD* vtable_CGridCtrl, CString str, int nRow, int nCol)`
+  // <cff_explorer>.`CString* __fastcall CGridCtrl::GetItemText(CWnd* pWnd, CString str, int nRow, int nCol)`
   // pattern = "44 89 4C 24 20 44 89 44 24 18 48 89 54 24 10 48 89 4C 24 08 48 83 EC ?? C7 44 24 28 00 00 00 00 83 7C 24 50 00 7C 29";
   // 0000000140160680 | 44:894C24 20       | mov dword ptr ss:[rsp+20],r9d
   // 0000000140160685 | 44:894424 18       | mov dword ptr ss:[rsp+18],r8d
