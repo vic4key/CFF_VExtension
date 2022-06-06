@@ -62,8 +62,8 @@ BEGIN
     CONTROL         "Shorten the Undecorated C++ Symbol Names",IDC_OPTION_SHORTEN_UNDECORATED_SYMBOL,
                     "Button",BS_AUTOCHECKBOX | WS_TABSTOP,32,50,163,10,WS_EX_TRANSPARENT
     PUSHBUTTON      "Save",IDC_OPTION_SAVE,6,84,50,14
-    CONTROL         "Auto Expand the Width of the Name Column in API Tables",IDC_OPTION_AUTO_EXPAND_LAST_COLUMN,
-                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,65,201,10
+    CONTROL         "Auto Fit the Width of the Name Column in API Tables",IDC_OPTION_AUTO_FIT_LAST_COLUMN,
+                    "Button",BS_AUTOCHECKBOX | WS_TABSTOP,15,65,185,10
 END
 
 

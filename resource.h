@@ -7,7 +7,7 @@
 #define IDC_OPTION_SAVE                 1002
 #define IDC_OPTION_UNDECORATE_SYMBOL    1003
 #define IDC_OPTION_SHORTEN_UNDECORATED_SYMBOL 1004
-#define IDC_OPTION_AUTO_EXPAND_LAST_COLUMN 1005
+#define IDC_OPTION_AUTO_FIT_LAST_COLUMN 1005
 
 // Next default values for new objects
 // 

@@ -13,7 +13,7 @@ VExtensionPage::VExtensionPage(json& prefs)
   , m_option_resolve_ordinal(nullptr)
   , m_option_undecorate_symbol(nullptr)
   , m_option_shorten_undecorated_symbol(nullptr)
-  , m_option_auto_expand_last_column(nullptr)
+  , m_option_auto_fit_width_column_name(nullptr)
 {
 }
 
@@ -30,7 +30,7 @@ LRESULT VExtensionPage::DlgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPar
       m_option_resolve_ordinal = GetDlgItem(hWnd, IDC_OPTION_RESOLVE_ORDINAL);
       m_option_undecorate_symbol = GetDlgItem(hWnd, IDC_OPTION_UNDECORATE_SYMBOL);
       m_option_shorten_undecorated_symbol = GetDlgItem(hWnd, IDC_OPTION_SHORTEN_UNDECORATED_SYMBOL);
-      m_option_auto_expand_last_column = GetDlgItem(hWnd, IDC_OPTION_AUTO_EXPAND_LAST_COLUMN);
+      m_option_auto_fit_width_column_name = GetDlgItem(hWnd, IDC_OPTION_AUTO_FIT_LAST_COLUMN);
 
       bool resolve_ordinal = json_get_option(m_prefs, "resolve_ordinal", true);
       Button_SetCheck(m_option_resolve_ordinal, resolve_ordinal ? BST_CHECKED : BST_UNCHECKED);
@@ -42,8 +42,8 @@ LRESULT VExtensionPage::DlgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPar
       Button_SetCheck(m_option_shorten_undecorated_symbol, shorten_undecorated_symbol ? BST_CHECKED : BST_UNCHECKED);
       Button_Enable(m_option_shorten_undecorated_symbol, undecorate_symbol ? TRUE : FALSE);
 
-      bool auto_expand_last_column = json_get_option(m_prefs, "auto_expand_name_column_width", true);
-      Button_SetCheck(m_option_auto_expand_last_column, auto_expand_last_column ? BST_CHECKED : BST_UNCHECKED);
+      bool auto_fit_width_column_name = json_get_option(m_prefs, "auto_fit_width_column_name", true);
+      Button_SetCheck(m_option_auto_fit_width_column_name, auto_fit_width_column_name ? BST_CHECKED : BST_UNCHECKED);
     }
     break;
 
@@ -73,10 +73,10 @@ LRESULT VExtensionPage::DlgProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPar
         }
         break;
 
-        case IDC_OPTION_AUTO_EXPAND_LAST_COLUMN:
+        case IDC_OPTION_AUTO_FIT_LAST_COLUMN:
         {
-          bool auto_expand_last_column = Button_GetCheck(m_option_auto_expand_last_column) == BST_CHECKED;
-          json_set_option(m_prefs, "auto_expand_name_column_width", auto_expand_last_column);
+          bool auto_fit_width_column_name = Button_GetCheck(m_option_auto_fit_width_column_name) == BST_CHECKED;
+          json_set_option(m_prefs, "auto_fit_width_column_name", auto_fit_width_column_name);
         }
         break;
 

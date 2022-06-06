@@ -3,7 +3,7 @@
     "resolve_ordinal": true,
     "undecorate_symbol": true,
     "shorten_undecorated_symbol": true,
-    "auto_expand_name_column_width": true
+    "auto_fit_width_column_name": true
   },
   "symbol_name_rules": [
     {

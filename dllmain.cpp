@@ -119,8 +119,8 @@ void __fastcall CGridCtrl_OnSize_hook(CWnd* pWnd, unsigned int nType, unsigned i
   {
     ImportExportDirectory_Below_Grid = pWnd;
 
-    bool auto_expand_last_column = json_get_option(g_prefs, "auto_expand_name_column_width", true);
-    if (auto_expand_last_column)
+    bool auto_fit_width_column_name = json_get_option(g_prefs, "auto_fit_width_column_name", true);
+    if (auto_fit_width_column_name)
     {
       vu::Debouncer::instance().debounce(ImportExportDirectory_Below_Grid_ID, 100, [&]() // 100ms
       {
@@ -218,8 +218,8 @@ QWORD __fastcall CGridCtrl_SendMessageToParent_hook(CWnd* pWnd, int nRow, int nC
 
   auto result = CGridCtrl_SendMessageToParent_backup(pWnd, nRow, nCol, nMessage);
 
-  bool auto_expand_last_column = json_get_option(g_prefs, "auto_expand_name_column_width", true);
-  if (auto_expand_last_column)
+  bool auto_fit_width_column_name = json_get_option(g_prefs, "auto_fit_width_column_name", true);
+  if (auto_fit_width_column_name)
   {
     CGridCtrl_ExpandLastColumn_Ex(ImportExportDirectory_Below_Grid);
   }

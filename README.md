@@ -10,7 +10,7 @@ _ _ _
 > 
 > * Shorten symbol name for several C++ libraries such as STL (you can easily modify or add more rules in the configuration file [VExtension.json](bins/VExtension/VExtension.json)).
 > 
-> * Auto Expand the Width of the Name Column in API Tables
+> * Auto Fit the Width of the Name Column in API Tables
 
 #### Usage
 
